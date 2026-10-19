@@ -1,5 +1,8 @@
 # Review des Prototyps `prototype/kickball.html`
 
+> Hinweis: Dieser Review betrifft den alten Prototyp. Die Punkte sind in der
+> TypeScript-Neuentwicklung unter `src/` umgesetzt.
+
 Stand: Code-Lektüre, nicht im Browser getestet. Zeilennummern beziehen sich auf
 `prototype/kickball.html`.
 
