@@ -8,6 +8,7 @@ import type { GameEvent, MatchState, TeamId } from '../core/types';
 import { Input } from './input';
 import { loadProgress, markCompleted } from './progress';
 import { Renderer } from './renderer';
+import { unitSprite } from './sprites';
 
 /** Das Heimteam spielt der Mensch, das Auswärtsteam die KI. */
 const HUMAN: TeamId = 'home';
@@ -163,7 +164,9 @@ function showMenu(): void {
     btn.className = 'level';
     btn.disabled = !isUnlocked(i, completed);
     const badge = completed.includes(level.id) ? '✓ Geschafft' : btn.disabled ? 'Gesperrt' : `Kapitel ${i + 1}`;
-    btn.innerHTML = `<span class="badge"></span><span class="title"></span><span class="intro"></span>`;
+    btn.innerHTML = `<span class="text"><span class="badge"></span><span class="title"></span><span class="intro"></span></span><img class="portrait" alt="" />`;
+    const away = level.setup.away;
+    btn.querySelector<HTMLImageElement>('.portrait')!.src = unitSprite(away.formation[0]!.kind, away.color, away.look).toDataURL();
     btn.querySelector('.badge')!.textContent = badge;
     btn.querySelector('.title')!.textContent = level.title;
     btn.querySelector('.intro')!.textContent = level.intro;

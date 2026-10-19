@@ -16,6 +16,7 @@ export const HEROES: TeamSetup = {
 const RIVALS: TeamSetup = {
   name: 'Schwarze Ritter',
   color: '#ef5350',
+  look: 'dark',
   formation: HEROES.formation,
 };
 

@@ -1,6 +1,7 @@
 import { FIELD, SHOT } from '../core/config';
 import { POSTS } from '../core/physics';
-import type { GameEvent, MatchState, TeamId, Unit } from '../core/types';
+import type { GameEvent, MatchState, TeamId, TeamLook, Unit } from '../core/types';
+import { unitSprite } from './sprites';
 
 /** Rand um Feld und Tore in Feld-Einheiten. */
 const MARGIN = 16;
@@ -115,7 +116,8 @@ export class Renderer {
     for (const u of state.units) {
       if (!u.active) continue;
       const highlight = opts.selectable === u.team;
-      this.drawUnit(u, state.setup[u.team].color, u.id === selectedId, highlight);
+      const team = state.setup[u.team];
+      this.drawUnit(u, team.color, team.look, u.id === selectedId, highlight);
     }
     this.drawBall(state.ball.x, state.ball.y, state.ball.radius);
     if (opts.drag) this.drawDrag(opts.drag);
@@ -210,7 +212,7 @@ export class Renderer {
     }
   }
 
-  private drawUnit(u: Unit, color: string, selected: boolean, highlight: boolean): void {
+  private drawUnit(u: Unit, color: string, look: TeamLook | undefined, selected: boolean, highlight: boolean): void {
     const ctx = this.ctx;
     const r = u.radius;
     const flash = this.flashes.get(u.id) ?? 0;
@@ -218,44 +220,41 @@ export class Renderer {
     ctx.save();
     ctx.translate(u.x, u.y);
 
+    // Schlagschatten
+    ctx.beginPath();
+    ctx.ellipse(r * 0.08, r * 0.14, r, r * 0.96, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fill();
+
+    // Porträt der Einheit
+    ctx.drawImage(unitSprite(u.kind, color, look), -r, -r, 2 * r, 2 * r);
+    if (flash > 0) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,255,255,${Math.min(0.8, flash * 2.5)})`;
+      ctx.fill();
+    }
+
+    // Rand = Lebenspunkte: ein Segment pro HP, verlorene dunkel
     if (selected || highlight) {
       ctx.shadowColor = color;
       ctx.shadowBlur = selected ? 40 : 14 + 8 * Math.sin(this.clock * 4);
     }
+    const hr = r * 0.93;
+    ctx.lineWidth = r * (selected ? 0.17 : 0.14);
     ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fillStyle = flash > 0 ? `rgba(255,255,255,${0.25 + flash * 2})` : color + '24';
-    ctx.fill();
-    ctx.lineWidth = u.kind === 'orc' ? 8 : selected ? 6 : 4;
-    ctx.strokeStyle = color;
+    ctx.arc(0, 0, hr, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(10,14,16,0.9)';
     ctx.stroke();
     ctx.shadowBlur = 0;
-
-    // Kennzeichen je Einheitentyp
-    ctx.fillStyle = color + (selected ? 'ff' : 'bb');
-    ctx.beginPath();
-    if (u.kind === 'knight') {
-      ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2);
-    } else if (u.kind === 'goblin') {
-      const k = r * 0.34;
-      ctx.moveTo(0, -k); ctx.lineTo(k, 0); ctx.lineTo(0, k); ctx.lineTo(-k, 0); ctx.closePath();
-    } else {
-      const k = r * 0.24;
-      ctx.rect(-k, -k, 2 * k, 2 * k);
-    }
-    ctx.fill();
-
-    // HP-Ring: ein Segment pro Lebenspunkt
-    const segGap = 0.12;
+    const segGap = 0.1;
     const seg = (Math.PI * 2) / u.maxHp;
-    const hr = r * 0.66;
-    ctx.lineWidth = Math.max(5, r * 0.09);
-    ctx.lineCap = 'round';
+    ctx.lineWidth = r * (selected ? 0.12 : 0.09);
     for (let i = 0; i < u.maxHp; i++) {
       const a0 = -Math.PI / 2 + i * seg + segGap / 2;
       ctx.beginPath();
       ctx.arc(0, 0, hr, a0, a0 + seg - segGap);
-      ctx.strokeStyle = i < u.hp ? color : 'rgba(255,255,255,0.10)';
+      ctx.strokeStyle = i < u.hp ? color : 'rgba(255,255,255,0.12)';
       ctx.stroke();
     }
     ctx.restore();
