@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Kickball</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #080c0f;
+      display: flex; justify-content: center; align-items: center;
+      overflow: hidden;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      touch-action: none;
+    }
+    canvas { display: block; touch-action: none; }
+    #ui {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 20px; pointer-events: none; z-index: 10;
+    }
+    .score-block { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+    .score-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.35); }
+    .score-number { font-size: 30px; font-weight: 800; line-height: 1; }
+    .score-number.player { color: #4fc3f7; }
+    .score-number.ai     { color: #ef5350; }
+    #turn-indicator { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; text-align: center; transition: color 0.3s; }
+    #overlay {
+      position: fixed; inset: 0; background: rgba(5,10,14,0.93);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 18px; z-index: 20;
+    }
+    #overlay h1 { font-size: 36px; font-weight: 900; color: #fff; letter-spacing: -1px; }
+    #overlay .sub { color: rgba(255,255,255,0.45); font-size: 13px; text-align: center; max-width: 260px; line-height: 1.7; }
+    #overlay button {
+      margin-top: 8px; padding: 15px 44px; border: none; border-radius: 50px;
+      background: #4fc3f7; color: #08100f; font-size: 16px; font-weight: 800;
+      letter-spacing: 0.5px; cursor: pointer; transition: transform 0.1s;
+    }
+    #overlay button:active { transform: scale(0.96); }
+    #overlay.hidden { display: none; }
+    #goal-msg {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 48px; font-weight: 900; letter-spacing: -1px;
+      pointer-events: none; z-index: 15; opacity: 0;
+      transition: opacity 0.2s;
+    }
+    #goal-msg.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<div id="ui">
+  <div class="score-block">
+    <span class="score-label">Du</span>
+    <span class="score-number player" id="score-player">0</span>
+  </div>
+  <div id="turn-indicator" style="color:rgba(255,255,255,0.4)">–</div>
+  <div class="score-block">
+    <span class="score-label">KI</span>
+    <span class="score-number ai" id="score-ai">0</span>
+  </div>
+</div>
+
+<canvas id="canvas"></canvas>
+<div id="goal-msg"></div>
+
+<div id="overlay">
+  <h1>Kickball</h1>
+  <p class="sub">Wähle einen deiner Spieler (blau), ziehe zurück und lass los.<br>Schieß den Ball ins obere Tor!</p>
+  <button id="start-btn">Anstoß ▶</button>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const CONFIG = {
+  FIELD_PADDING_X: 0.03,
+  FIELD_PADDING_Y: 0.04,
+  GOAL_WIDTH_RATIO: 0.40,
+  GOAL_DEPTH: 30,
+  PLAYER_RADIUS_RATIO: 0.074,
+  BALL_RADIUS_RATIO:   0.037,
+  FRICTION: 0.983,
+  MIN_SPEED: 0.12,
+  RESTITUTION: 0.74,
+  WALL_RESTITUTION: 0.60,
+  MAX_PULL_RATIO: 0.20,
+  SHOT_POWER: 20,
+  AI_THINK_DELAY: 850,
+  AI_SHOT_SCATTER: 0.22,
+  PLAYER_FORMATION: [
+    { x: 0.20, y: 0.76 }, { x: 0.50, y: 0.83 }, { x: 0.80, y: 0.76 },
+  ],
+  AI_FORMATION: [
+    { x: 0.20, y: 0.24 }, { x: 0.50, y: 0.17 }, { x: 0.80, y: 0.24 },
+  ],
+  BALL_START: { x: 0.50, y: 0.50 },
+  COLOR_PLAYER:      '#4fc3f7',
+  COLOR_AI:          '#ef5350',
+  COLOR_BALL:        '#f0f0f0',
+  COLOR_FIELD:       '#0f1f10',
+  COLOR_FIELD_LINE:  'rgba(255,255,255,0.10)',
+  COLOR_GOAL_PLAYER: 'rgba(79,195,247,0.18)',
+  COLOR_GOAL_AI:     'rgba(239,83,80,0.18)',
+};
+
+// ── ENTITIES ─────────────────────────────────────────────────────────────────
+class Circle {
+  constructor(x, y, r) {
+    this.x = x; this.y = y; this.vx = 0; this.vy = 0;
+    this.radius = r;
+    this.mass   = r * r;
+  }
+}
+class Player extends Circle {
+  constructor(x, y, r, team) {
+    super(x, y, r); this.team = team; this.active = true;
+  }
+}
+class Ball extends Circle {
+  constructor(x, y, r) { super(x, y, r); this.mass = r * r * 0.55; }
+}
+
+// ── PHYSICS ──────────────────────────────────────────────────────────────────
+function applyFriction(es) {
+  for (const e of es) {
+    e.vx *= CONFIG.FRICTION; e.vy *= CONFIG.FRICTION;
+    if (Math.hypot(e.vx, e.vy) < CONFIG.MIN_SPEED) { e.vx = 0; e.vy = 0; }
+  }
+}
+function integrate(es) { for (const e of es) { e.x += e.vx; e.y += e.vy; } }
+
+function resolveWalls(es, f, goals) {
+  const topGoal = goals.find(g => g.isTop);
+  const botGoal = goals.find(g => !g.isTop);
+
+  for (const e of es) {
+    const r = e.radius;
+    const isBall = !(e instanceof Player);
+
+    // Seitenwände: immer abprallen
+    if (e.x - r < f.left)  { e.x = f.left  + r; e.vx =  Math.abs(e.vx) * CONFIG.WALL_RESTITUTION; }
+    if (e.x + r > f.right) { e.x = f.right - r; e.vx = -Math.abs(e.vx) * CONFIG.WALL_RESTITUTION; }
+
+    // Obere Wand
+    if (e.y - r < f.top) {
+      const inGoalX = topGoal && e.x > topGoal.x - topGoal.width/2 && e.x < topGoal.x + topGoal.width/2;
+      if (isBall && inGoalX) {
+        // Nur der Ball darf durchs Tor – Spieler prallen immer ab
+      } else {
+        e.y = f.top + r;
+        e.vy = Math.abs(e.vy) * CONFIG.WALL_RESTITUTION;
+      }
+    }
+
+    // Untere Wand
+    if (e.y + r > f.bottom) {
+      const inGoalX = botGoal && e.x > botGoal.x - botGoal.width/2 && e.x < botGoal.x + botGoal.width/2;
+      if (isBall && inGoalX) {
+        // Nur der Ball darf durchs Tor
+      } else {
+        e.y = f.bottom - r;
+        e.vy = -Math.abs(e.vy) * CONFIG.WALL_RESTITUTION;
+      }
+    }
+  }
+}
+
+function resolveCollisions(es) {
+  for (let i = 0; i < es.length; i++) {
+    for (let j = i + 1; j < es.length; j++) {
+      const a = es[i], b = es[j];
+      if (a.active === false || b.active === false) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy);
+      const minD = a.radius + b.radius;
+      if (dist >= minD || dist < 0.001) continue;
+
+      const nx = dx / dist, ny = dy / dist;
+      const overlap = (minD - dist) / 2;
+      const tm = a.mass + b.mass;
+      a.x -= nx * overlap * (b.mass / tm); a.y -= ny * overlap * (b.mass / tm);
+      b.x += nx * overlap * (a.mass / tm); b.y += ny * overlap * (a.mass / tm);
+
+      const dvx = b.vx - a.vx, dvy = b.vy - a.vy;
+      const dot = dvx * nx + dvy * ny;
+      if (dot >= 0) continue;
+
+      const imp = (2 * dot) / tm * CONFIG.RESTITUTION;
+      a.vx += imp * b.mass * nx; a.vy += imp * b.mass * ny;
+      b.vx -= imp * a.mass * nx; b.vy -= imp * a.mass * ny;
+    }
+  }
+}
+
+function allAtRest(es) {
+  return es.every(e => Math.hypot(e.vx, e.vy) < CONFIG.MIN_SPEED);
+}
+
+// ── RENDERER ─────────────────────────────────────────────────────────────────
+class Renderer {
+  constructor(canvas) { this.c = canvas; this.ctx = canvas.getContext('2d'); }
+
+  clear() { this.ctx.clearRect(0, 0, this.c.width, this.c.height); }
+
+  drawField(f, goals) {
+    const ctx = this.ctx;
+    const W = f.right - f.left, H = f.bottom - f.top;
+    const cx = (f.left + f.right) / 2;
+    const cy = (f.top  + f.bottom) / 2;
+
+    // Rasen-Gradient
+    const grad = ctx.createLinearGradient(f.left, f.top, f.left, f.bottom);
+    grad.addColorStop(0,   '#0d1f0e');
+    grad.addColorStop(0.5, '#111f12');
+    grad.addColorStop(1,   '#0d1f0e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(f.left, f.top, W, H);
+
+    // Rasenstreifen (Zebra)
+    const stripeCount = 10;
+    const stripeH = H / stripeCount;
+    for (let i = 0; i < stripeCount; i += 2) {
+      ctx.fillStyle = 'rgba(255,255,255,0.018)';
+      ctx.fillRect(f.left, f.top + i * stripeH, W, stripeH);
+    }
+
+    // Feldlinien
+    ctx.strokeStyle = CONFIG.COLOR_FIELD_LINE;
+    ctx.lineWidth = 1.5;
+
+    // Außenlinien
+    ctx.strokeRect(f.left, f.top, W, H);
+
+    // Mittellinie
+    ctx.beginPath(); ctx.moveTo(f.left, cy); ctx.lineTo(f.right, cy); ctx.stroke();
+
+    // Mittelkreis
+    ctx.beginPath(); ctx.arc(cx, cy, W * 0.13, 0, Math.PI * 2); ctx.stroke();
+
+    // Tore
+    for (const g of goals) {
+      const hw = g.width / 2;
+      const isTop = g.isTop;
+      const teamColor = g.team === 'ai' ? CONFIG.COLOR_AI : CONFIG.COLOR_PLAYER;
+
+      ctx.fillStyle = g.team === 'ai' ? CONFIG.COLOR_GOAL_AI : CONFIG.COLOR_GOAL_PLAYER;
+      if (isTop) {
+        ctx.fillRect(g.x - hw, g.y - g.depth, g.width, g.depth);
+        ctx.strokeStyle = teamColor; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(g.x - hw, g.y); ctx.lineTo(g.x + hw, g.y); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(g.x - hw, g.y - g.depth, g.width, g.depth);
+      } else {
+        ctx.fillRect(g.x - hw, g.y, g.width, g.depth);
+        ctx.strokeStyle = teamColor; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(g.x - hw, g.y); ctx.lineTo(g.x + hw, g.y); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(g.x - hw, g.y, g.width, g.depth);
+      }
+
+      // Tor-Label
+      ctx.fillStyle = teamColor;
+      ctx.globalAlpha = 0.5;
+      ctx.font = '9px system-ui';
+      ctx.textAlign = 'center';
+      ctx.letterSpacing = '2px';
+      const labelY = isTop ? g.y - g.depth / 2 : g.y + g.depth / 2 + 4;
+      ctx.fillText(g.team === 'ai' ? 'KI-TOR' : 'DEIN TOR', g.x, labelY);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  drawPlayer(p, isSelected) {
+    const ctx = this.ctx;
+    const color = p.team === 'player' ? CONFIG.COLOR_PLAYER : CONFIG.COLOR_AI;
+
+    if (isSelected) { ctx.shadowBlur = 22; ctx.shadowColor = color; }
+
+    // Äußerer Ring
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fillStyle = color + '1a';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isSelected ? 3 : 2;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Innerer Punkt
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = color + (isSelected ? 'ff' : 'aa');
+    ctx.fill();
+  }
+
+  drawBall(ball) {
+    const ctx = this.ctx;
+    const r = ball.radius;
+
+    // Schatten
+    ctx.beginPath(); ctx.arc(ball.x + 2, ball.y + 3, r * 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fill();
+
+    // Ball
+    const g = ctx.createRadialGradient(ball.x - r*0.35, ball.y - r*0.35, r*0.05, ball.x, ball.y, r);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.6, '#e0e0e0'); g.addColorStop(1, '#aaaaaa');
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = g; ctx.fill();
+
+    // Glanzpunkt
+    ctx.beginPath(); ctx.arc(ball.x - r*0.3, ball.y - r*0.3, r*0.18, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
+  }
+
+  drawDragIndicator(drag, maxPull) {
+    if (!drag) return;
+    const ctx = this.ctx;
+    const dx = drag.startX - drag.currentX;
+    const dy = drag.startY - drag.currentY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 5) return;
+
+    const clamped = Math.min(dist, maxPull);
+    const ratio   = clamped / maxPull;
+    const nx = dx / dist, ny = dy / dist;
+    const e = drag.entity;
+
+    ctx.save();
+
+    // Pfeil-Richtung (Schussrichtung)
+    const arrowLen = clamped * 1.3 + e.radius;
+    ctx.strokeStyle = `rgba(255,255,255,${0.25 + ratio * 0.45})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 7]);
+    ctx.beginPath();
+    ctx.moveTo(e.x + nx * e.radius, e.y + ny * e.radius);
+    ctx.lineTo(e.x + nx * arrowLen, e.y + ny * arrowLen);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Verbindung zum Finger (Rückzug-Linie)
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(drag.currentX, drag.currentY); ctx.stroke();
+
+    // Power-Streifen (quer zur Schussrichtung)
+    const perpX = -ny, perpY = nx;
+    const numStripes = 7;
+    for (let i = 0; i < numStripes; i++) {
+      const t = (i + 1) / (numStripes + 1);
+      if (t > ratio) break;
+      const alpha = 0.2 + t * 0.65;
+      const sLen  = 4 + t * 6;
+      const sx = e.x + nx * (e.radius + t * arrowLen * 0.85);
+      const sy = e.y + ny * (e.radius + t * arrowLen * 0.85);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx - perpX * sLen, sy - perpY * sLen);
+      ctx.lineTo(sx + perpX * sLen, sy + perpY * sLen);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawFlash(f, team, alpha) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.28;
+    ctx.fillStyle = team === 'player' ? CONFIG.COLOR_PLAYER : CONFIG.COLOR_AI;
+    ctx.fillRect(f.left, f.top, f.right - f.left, f.bottom - f.top);
+    ctx.restore();
+  }
+}
+
+// ── INPUT ────────────────────────────────────────────────────────────────────
+class Input {
+  constructor(canvas) {
+    this.canvas  = canvas;
+    this.drag    = null;
+    this.onShoot = null;
+    this.selectable = [];
+    this.maxPull = 100;
+
+    const opts = { passive: false };
+    canvas.addEventListener('touchstart',  e => this._start(e), opts);
+    canvas.addEventListener('touchmove',   e => this._move(e),  opts);
+    canvas.addEventListener('touchend',    e => this._end(e),   opts);
+    canvas.addEventListener('touchcancel', e => this._end(e),   opts);
+    canvas.addEventListener('mousedown',   e => this._start(e));
+    canvas.addEventListener('mousemove',   e => this._move(e));
+    canvas.addEventListener('mouseup',     e => this._end(e));
+  }
+
+  _pos(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const src  = e.touches ? e.touches[0] : e;
+    return {
+      x: (src.clientX - rect.left) * (this.canvas.width  / rect.width),
+      y: (src.clientY - rect.top)  * (this.canvas.height / rect.height),
+    };
+  }
+
+  _start(e) {
+    e.preventDefault();
+    const pos = this._pos(e);
+    let best = null, bestD = Infinity;
+    for (const p of this.selectable) {
+      if (!p.active) continue;
+      const d = Math.hypot(pos.x - p.x, pos.y - p.y);
+      if (d < p.radius * 2.5 && d < bestD) { best = p; bestD = d; }
+    }
+    if (best) this.drag = { entity: best, startX: pos.x, startY: pos.y, currentX: pos.x, currentY: pos.y };
+  }
+
+  _move(e) {
+    e.preventDefault();
+    if (!this.drag) return;
+    const pos = this._pos(e);
+    this.drag.currentX = pos.x; this.drag.currentY = pos.y;
+  }
+
+  _end(e) {
+    e.preventDefault();
+    if (!this.drag) return;
+    const dx = this.drag.startX - this.drag.currentX;
+    const dy = this.drag.startY - this.drag.currentY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 6 && this.onShoot) {
+      const clamped = Math.min(dist, this.maxPull);
+      const scale   = (clamped / this.maxPull) * CONFIG.SHOT_POWER;
+      this.onShoot(this.drag.entity, (dx / dist) * scale, (dy / dist) * scale);
+    }
+    this.drag = null;
+  }
+}
+
+// ── AI ───────────────────────────────────────────────────────────────────────
+class AI {
+  constructor() { this.timer = null; this.busy = false; }
+
+  schedule(aiPlayers, ball, targetGoal, cb) {
+    if (this.busy) return;
+    this.busy = true;
+    const delay = CONFIG.AI_THINK_DELAY + Math.random() * 500;
+    this.timer = setTimeout(() => {
+      this.busy = false;
+      const shot = this._plan(aiPlayers.filter(p => p.active), ball, targetGoal);
+      if (shot) cb(shot);
+    }, delay);
+  }
+
+  _plan(players, ball, goal) {
+    if (!players.length) return null;
+    let best = null;
+
+    for (const p of players) {
+      const toBallX = ball.x - p.x, toBallY = ball.y - p.y;
+      const d = Math.hypot(toBallX, toBallY);
+      const gx = goal.x - ball.x, gy = goal.y - ball.y;
+      const gd = Math.hypot(gx, gy);
+
+      const nx = toBallX / d, ny = toBallY / d;
+      const angle  = Math.atan2(ny, nx) + (Math.random() - 0.5) * CONFIG.AI_SHOT_SCATTER;
+      const power  = (0.55 + Math.random() * 0.45) * CONFIG.SHOT_POWER;
+      const vx = Math.cos(angle) * power, vy = Math.sin(angle) * power;
+
+      const align = nx * (gx / gd) + ny * (gy / gd);
+      const quality = align - d * 0.001;
+
+      if (!best || quality > best.quality) best = { player: p, vx, vy, quality };
+    }
+    return best;
+  }
+
+  cancel() { clearTimeout(this.timer); this.busy = false; }
+}
+
+// ── GAME ─────────────────────────────────────────────────────────────────────
+const STATES = { IDLE:'idle', PLAYER:'player', SIM:'sim', AI:'ai', GOAL:'goal' };
+
+class Game {
+  constructor() {
+    this.canvas   = document.getElementById('canvas');
+    this.renderer = new Renderer(this.canvas);
+    this.input    = new Input(this.canvas);
+    this.ai       = new AI();
+    this.state    = STATES.IDLE;
+    this.score    = { player: 0, ai: 0 };
+    this.flash    = { timer: 0, team: null };
+    this.lastTurn = null; // 'player' | 'ai'
+
+    this.input.onShoot = (ent, vx, vy) => {
+      if (this.state !== STATES.PLAYER) return;
+      ent.vx = vx; ent.vy = vy;
+      this.lastTurn = 'player';  // sofort markieren: Spieler hat gerade geschossen
+      this._setState(STATES.SIM);
+    };
+  }
+
+  init() {
+    this._compute();
+    this._spawn();
+    this._setState(STATES.PLAYER);
+    this.lastTurn = 'ai'; // Spieler beginnt
+    requestAnimationFrame(() => this._loop());
+  }
+
+  _compute() {
+    const W = this.canvas.width, H = this.canvas.height;
+    const px = W * CONFIG.FIELD_PADDING_X, py = H * CONFIG.FIELD_PADDING_Y;
+    this.field = { left: px, right: W - px, top: py + 48, bottom: H - py };
+    const fw = this.field.right - this.field.left;
+    const fh = this.field.bottom - this.field.top;
+    this.pr  = fw * CONFIG.PLAYER_RADIUS_RATIO;
+    this.br  = fw * CONFIG.BALL_RADIUS_RATIO;
+    this.maxPull = fw * CONFIG.MAX_PULL_RATIO;
+    this.input.maxPull = this.maxPull;
+
+    const cx = (this.field.left + this.field.right) / 2;
+    const gw = fw * CONFIG.GOAL_WIDTH_RATIO;
+    this.goals = [
+      { x: cx, y: this.field.top,    width: gw, depth: CONFIG.GOAL_DEPTH, team: 'ai',     isTop: true  },
+      { x: cx, y: this.field.bottom, width: gw, depth: CONFIG.GOAL_DEPTH, team: 'player', isTop: false },
+    ];
+  }
+
+  _spawn() {
+    const fw = this.field.right - this.field.left;
+    const fh = this.field.bottom - this.field.top;
+    const abs = (nx, ny) => ({ x: this.field.left + nx * fw, y: this.field.top + ny * fh });
+
+    this.players   = CONFIG.PLAYER_FORMATION.map(f => { const p = abs(f.x, f.y); return new Player(p.x, p.y, this.pr, 'player'); });
+    this.aiPlayers = CONFIG.AI_FORMATION.map(f    => { const p = abs(f.x, f.y); return new Player(p.x, p.y, this.pr, 'ai');     });
+    const bp = abs(CONFIG.BALL_START.x, CONFIG.BALL_START.y);
+    this.ball = new Ball(bp.x, bp.y, this.br);
+  }
+
+  _allEntities() { return [...this.players, ...this.aiPlayers, this.ball]; }
+
+  _loop() {
+    this._update();
+    this._draw();
+    requestAnimationFrame(() => this._loop());
+  }
+
+  _update() {
+    if (this.flash.timer > 0) this.flash.timer = Math.max(0, this.flash.timer - 1/60);
+
+    if (this.state !== STATES.SIM) return;
+
+    const all = this._allEntities().filter(e => e.active !== false);
+    applyFriction(all);
+    integrate(all);
+    resolveWalls(all, this.field, this.goals);
+    resolveCollisions(all);
+
+    // Tor? Ball hinter der Torlinie
+    const ball = this.ball;
+    for (const g of this.goals) {
+      const hw = g.width / 2;
+      const inX = ball.x > g.x - hw && ball.x < g.x + hw;
+      const inY = g.isTop
+        ? ball.y < g.y          // Ball hat obere Linie überschritten
+        : ball.y > g.y;         // Ball hat untere Linie überschritten
+      if (inX && inY) { this._goal(g); return; }
+    }
+
+    if (allAtRest(all)) {
+      // Wechsel: wer zuletzt dran war → anderer ist jetzt dran
+      if (this.lastTurn === 'player') {
+        this.lastTurn = 'ai';
+        this._setState(STATES.AI);
+        this._runAI();
+      } else {
+        this.lastTurn = 'player';
+        this._setState(STATES.PLAYER);
+      }
+    }
+  }
+
+  _runAI() {
+    const playerGoal = this.goals.find(g => g.team === 'player');
+    this.ai.schedule(this.aiPlayers, this.ball, playerGoal, shot => {
+      if (this.state !== STATES.AI) return;
+      shot.player.vx = shot.vx; shot.player.vy = shot.vy;
+      this.lastTurn = 'ai';  // sofort markieren: KI hat gerade geschossen
+      this._setState(STATES.SIM);
+    });
+  }
+
+  _goal(g) {
+    const scorer = g.team === 'ai' ? 'player' : 'ai';
+    const conceder = scorer === 'player' ? 'ai' : 'player'; // Wer kassiert hat → Anstoß
+    this.score[scorer]++;
+    document.getElementById(`score-${scorer}`).textContent = this.score[scorer];
+    this.flash.timer = 1.6; this.flash.team = scorer;
+    this._showGoalMsg(scorer);
+    this.ai.cancel();
+    this._setState(STATES.GOAL);
+    setTimeout(() => {
+      this._spawn();
+      if (conceder === 'player') {
+        // Spieler hat kassiert → Spieler hat Anstoß
+        this.lastTurn = 'ai';      // lastTurn='ai' → nächster Zug = PLAYER
+        this._setState(STATES.PLAYER);
+      } else {
+        // KI hat kassiert → KI hat Anstoß
+        this.lastTurn = 'player';  // lastTurn='player' → nächster Zug = AI
+        this._setState(STATES.AI);
+        this._runAI();
+      }
+    }, 2000);
+  }
+
+  _showGoalMsg(scorer) {
+    const el = document.getElementById('goal-msg');
+    el.textContent = scorer === 'player' ? '⚽ TOR!' : '💀 Gegentor';
+    el.style.color = scorer === 'player' ? CONFIG.COLOR_PLAYER : CONFIG.COLOR_AI;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1600);
+  }
+
+  _setState(s) {
+    this.state = s;
+    const el = document.getElementById('turn-indicator');
+    const map = {
+      [STATES.PLAYER]: ['▶ Dein Zug',   '#4fc3f7'],
+      [STATES.AI]:     ['◀ KI denkt…',  '#ef5350'],
+      [STATES.SIM]:    ['···',           'rgba(255,255,255,0.35)'],
+      [STATES.GOAL]:   ['⚽ TOR!',       '#ffd600'],
+      [STATES.IDLE]:   ['–',             'rgba(255,255,255,0.3)'],
+    };
+    const [txt, col] = map[s] || ['–', 'rgba(255,255,255,0.3)'];
+    el.textContent = txt; el.style.color = col;
+
+    // Auswählbare Spieler
+    this.input.selectable = s === STATES.PLAYER ? this.players : [];
+  }
+
+  _draw() {
+    const r = this.renderer;
+    r.clear();
+    r.drawField(this.field, this.goals);
+
+    if (this.flash.timer > 0) r.drawFlash(this.field, this.flash.team, Math.min(this.flash.timer, 1));
+
+    for (const p of this.aiPlayers)  if (p.active) r.drawPlayer(p, false);
+    const sel = this.input.drag?.entity ?? null;
+    for (const p of this.players)    if (p.active) r.drawPlayer(p, p === sel);
+    r.drawBall(this.ball);
+    if (this.input.drag) r.drawDragIndicator(this.input.drag, this.maxPull);
+  }
+}
+
+// ── CANVAS RESIZE ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+function resize() {
+  const W = window.innerWidth, H = window.innerHeight;
+  const ratio = 9 / 16;
+  if (W / H < ratio) { canvas.width = W; canvas.height = Math.min(H, Math.round(W / ratio)); }
+  else               { canvas.height = H; canvas.width  = Math.min(W, Math.round(H * ratio)); }
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── START ─────────────────────────────────────────────────────────────────────
+let game;
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('overlay').classList.add('hidden');
+  game = new Game();
+  game.init();
+});
+</script>
+</body>
+</html>
