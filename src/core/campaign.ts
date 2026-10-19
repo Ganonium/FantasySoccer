@@ -19,14 +19,16 @@ const RIVALS: TeamSetup = {
   formation: HEROES.formation,
 };
 
+// Gegner-Formationen haben immer einen Spieler in der Mitte vor dem Tor, damit kein freier
+// Schusskanal vom Anstoßpunkt direkt ins Tor führt.
 const GOBLINS: TeamSetup = {
   name: 'Goblins',
   color: '#9ccc65',
   formation: [
-    { kind: 'goblin', x: 0.14, y: 0.74 },
-    { kind: 'goblin', x: 0.38, y: 0.8 },
-    { kind: 'goblin', x: 0.62, y: 0.8 },
-    { kind: 'goblin', x: 0.86, y: 0.74 },
+    { kind: 'goblin', x: 0.5, y: 0.68 },
+    { kind: 'goblin', x: 0.22, y: 0.76 },
+    { kind: 'goblin', x: 0.78, y: 0.76 },
+    { kind: 'goblin', x: 0.5, y: 0.86 },
   ],
 };
 
@@ -34,8 +36,8 @@ const ORCS: TeamSetup = {
   name: 'Orks',
   color: '#ff8a50',
   formation: [
-    { kind: 'orc', x: 0.3, y: 0.78 },
-    { kind: 'orc', x: 0.7, y: 0.78 },
+    { kind: 'orc', x: 0.36, y: 0.7 },
+    { kind: 'orc', x: 0.56, y: 0.85 },
   ],
 };
 

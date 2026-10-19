@@ -140,22 +140,55 @@ function simulate(state: MatchState, dt: number, events: GameEvent[]): void {
   const atRest = allAtRest(activeUnits(state)) && allAtRest([ball]);
   if (atRest || state.phaseTime >= PHYSICS.MAX_SIM_TIME) {
     if (!atRest) stopAll(state);
+    goalKickIfNeeded(state, events);
     startTurn(state, otherTeam(state.turn), events);
   }
 }
 
-/** Gegnerische Einheiten verletzen sich beim Rammen: Schaden = ATK des Rammenden. */
+/**
+ * Bleibt der Ball im 5-Meter-Raum liegen, kommt er auf die vordere Ecke des Raums
+ * (wie ein Abstoß) – sonst wäre ein Ball direkt vor der Torlinie kaum zu verteidigen.
+ */
+function goalKickIfNeeded(state: MatchState, events: GameEvent[]): void {
+  const ball = state.ball;
+  const halfW = FIELD.goalAreaWidth / 2;
+  const cx = FIELD.width / 2;
+  const top = ball.y < FIELD.goalAreaDepth;
+  const bottom = ball.y > FIELD.height - FIELD.goalAreaDepth;
+  if (Math.abs(ball.x - cx) > halfW || (!top && !bottom)) return;
+
+  const y = top ? FIELD.goalAreaDepth : FIELD.height - FIELD.goalAreaDepth;
+  const side = ball.x < cx ? -1 : 1;
+  // Ecke auf der Seite des Balls bevorzugen; ist sie belegt, entlang der Linie zur Mitte rücken,
+  // danach die andere Ecke versuchen.
+  const candidates: number[] = [];
+  for (const s of [side, -side]) {
+    for (let step = 0; step <= halfW; step += 20) candidates.push(cx + s * (halfW - step));
+  }
+  const units = activeUnits(state);
+  const free = candidates.find(x =>
+    units.every(u => Math.hypot(u.x - x, u.y - y) >= u.radius + ball.radius + 2));
+  if (free === undefined) return;
+  ball.x = free;
+  ball.y = y;
+  events.push({ type: 'goalKick', x: ball.x, y: ball.y });
+}
+
+/**
+ * Rammen: Nur Einheiten des Teams, das gerade geschossen hat, verursachen Schaden, und nur
+ * wenn sie selbst schnell genug auf den Gegner zufahren. Ein weggestoßener Gegner, der in eine
+ * andere Einheit prallt, verletzt also niemanden. Schaden = ATK des Rammenden.
+ */
 function resolveHit(state: MatchState, c: UnitContact, events: GameEvent[]): void {
   const { a, b } = c;
   if (a.team === b.team || !a.active || !b.active) return;
-  if (c.approachA + c.approachB < COMBAT.MIN_IMPACT_SPEED) return;
+  const [attacker, target, approach] = a.team === state.turn ? [a, b, c.approachA] : [b, a, c.approachB];
+  if (approach < COMBAT.MIN_IMPACT_SPEED) return;
 
   const key = a.id < b.id ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;
   if (state.hitCooldowns[key] !== undefined) return;
   state.hitCooldowns[key] = COMBAT.HIT_COOLDOWN;
 
-  // Wer schneller auf den anderen zufährt, ist der Angreifer.
-  const [attacker, target] = c.approachA >= c.approachB ? [a, b] : [b, a];
   target.hp = Math.max(0, target.hp - attacker.atk);
   events.push({ type: 'hit', attackerId: attacker.id, targetId: target.id, damage: attacker.atk, x: c.x, y: c.y });
 

@@ -170,4 +170,24 @@ function collideWalls(b: Body, isBall: boolean, resolveVelocity: boolean, out: S
   const passes = isBall && inGoalMouth(b.x);
   if (!passes && b.y - r < 0) { b.y = r; bounce('vy', 1, b.x, 0); }
   if (!passes && b.y + r > FIELD.height) { b.y = FIELD.height - r; bounce('vy', -1, b.x, FIELD.height); }
+
+  // Abgerundete Ecken: Im Eckbereich liegt der Körper innerhalb eines Viertelkreises.
+  const R = FIELD.cornerRadius;
+  const cx = b.x < R ? R : b.x > FIELD.width - R ? FIELD.width - R : null;
+  const cy = b.y < R ? R : b.y > FIELD.height - R ? FIELD.height - R : null;
+  if (cx === null || cy === null) return;
+  const dx = b.x - cx;
+  const dy = b.y - cy;
+  const dist = Math.hypot(dx, dy);
+  const max = R - r;
+  if (dist <= max) return;
+  const nx = dx / dist;
+  const ny = dy / dist;
+  b.x = cx + nx * max;
+  b.y = cy + ny * max;
+  const vn = b.vx * nx + b.vy * ny;
+  if (!resolveVelocity || vn <= 0) return;
+  b.vx -= (1 + e) * vn * nx;
+  b.vy -= (1 + e) * vn * ny;
+  out.impacts.push({ kind: 'wall', speed: vn, x: cx + nx * R, y: cy + ny * R });
 }

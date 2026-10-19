@@ -82,6 +82,8 @@ export class Renderer {
       } else if (e.type === 'ko') {
         const u = state.units.find(x => x.id === e.unitId);
         this.effects.push({ kind: 'ko', x: e.x, y: e.y, t: 0, duration: 0.7, color: u ? state.setup[u.team].color : '#fff', radius: u?.radius ?? 60 });
+      } else if (e.type === 'goalKick') {
+        this.effects.push({ kind: 'ko', x: e.x, y: e.y, t: 0, duration: 0.8, color: '#ffffff', radius: state.ball.radius });
       } else if (e.type === 'goal') {
         this.effects.push({ kind: 'goal', x: 0, y: 0, t: 0, duration: 1.6, color: state.setup[e.scorer].color });
       }
@@ -125,20 +127,29 @@ export class Renderer {
     const W = FIELD.width;
     const H = FIELD.height;
 
+    const R = FIELD.cornerRadius;
+    const pitch = new Path2D();
+    pitch.roundRect(0, 0, W, H, R);
+
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, '#0d1f0e');
     grad.addColorStop(0.5, '#122413');
     grad.addColorStop(1, '#0d1f0e');
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fill(pitch);
 
+    ctx.save();
+    ctx.clip(pitch);
     ctx.fillStyle = 'rgba(255,255,255,0.02)';
     const stripes = 10;
     for (let i = 0; i < stripes; i += 2) ctx.fillRect(0, (i * H) / stripes, W, H / stripes);
+    ctx.restore();
 
     ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 4;
-    ctx.strokeRect(0, 0, W, H);
+    ctx.stroke(pitch);
+    ctx.save();
+    ctx.clip(pitch);
     ctx.beginPath();
     ctx.moveTo(0, H / 2);
     ctx.lineTo(W, H / 2);
@@ -147,10 +158,28 @@ export class Renderer {
     ctx.arc(W / 2, H / 2, W * 0.13, 0, Math.PI * 2);
     ctx.stroke();
     // Strafräume
-    const bw = FIELD.goalWidth * 1.6;
-    const bh = H * 0.11;
-    ctx.strokeRect((W - bw) / 2, 0, bw, bh);
-    ctx.strokeRect((W - bw) / 2, H - bh, bw, bh);
+    const pw = FIELD.penaltyAreaWidth;
+    const ph = FIELD.penaltyAreaDepth;
+    ctx.strokeRect((W - pw) / 2, 0, pw, ph);
+    ctx.strokeRect((W - pw) / 2, H - ph, pw, ph);
+    // 5-Meter-Räume (Abstoßzone) etwas deutlicher, mit Abstoßpunkten an den Ecken
+    const aw = FIELD.goalAreaWidth;
+    const ah = FIELD.goalAreaDepth;
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect((W - aw) / 2, 0, aw, ah);
+    ctx.fillRect((W - aw) / 2, H - ah, aw, ah);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.strokeRect((W - aw) / 2, 0, aw, ah);
+    ctx.strokeRect((W - aw) / 2, H - ah, aw, ah);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    for (const x of [(W - aw) / 2, (W + aw) / 2]) {
+      for (const y of [ah, H - ah]) {
+        ctx.beginPath();
+        ctx.arc(x, y, 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
 
     // Tore: oben verteidigt das Auswärtsteam, unten das Heimteam.
     const gx = (W - FIELD.goalWidth) / 2;

@@ -12,6 +12,7 @@ npm run dev        # Dev-Server, im LAN erreichbar: http://<PC-IP>:5173
 npm test           # Unit-Tests (Vitest)
 npm run build      # Typecheck + Produktions-Build nach dist/
 npm run preview    # Build lokal ansehen (inkl. Service Worker)
+npm run build:artifact  # Einzeldatei dist-artifact/fantasysoccer.html (z. B. als privates Claude-Artifact)
 ```
 
 Auf dem Android-Handy die LAN-Adresse im Chrome öffnen. Über „Zum Startbildschirm hinzufügen“
@@ -47,7 +48,8 @@ docs/              Übergabe aus Claude Chat und Review des Prototyps
 
 - Abwechselnd ein Schuss pro Zug; der nächste Zug beginnt, wenn alles ausgerollt ist.
 - Tor: der Ball überquert die Torlinie. Wer ein Tor kassiert, hat Anstoß.
-- **Rammen:** Stoßen zwei gegnerische Einheiten schnell genug zusammen, verliert die gerammte
-  Einheit so viele HP, wie der Angreifer ATK hat (Angreifer = wer schneller auf den anderen
-  zufährt). Bei 0 HP verlässt die Einheit das Feld.
+- **Abstoß:** Bleibt der Ball im 5-Meter-Raum liegen, wird er auf dessen vordere Ecke gelegt.
+- **Rammen:** Fährt eine Einheit des Teams, das gerade geschossen hat, schnell genug in einen
+  Gegner, verliert dieser so viele HP, wie der Rammende ATK hat. Weggestoßene Gegner, die in
+  andere Einheiten prallen, richten keinen Schaden an. Bei 0 HP verlässt die Einheit das Feld.
 - Sieg: zuerst `goalsToWin` Tore – oder alle gegnerischen Einheiten vom Feld gerammt.
