@@ -3,7 +3,7 @@
 
 export type TeamId = 'home' | 'away';
 
-export type UnitKind = 'knight' | 'goblin' | 'orc';
+export type UnitKind = 'knight' | 'goblin' | 'orc' | 'dragon';
 
 export interface Body {
   x: number;

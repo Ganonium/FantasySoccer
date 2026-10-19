@@ -2,7 +2,7 @@
 
 Fußball-Billard mit Fantasy-Gegnern – ein mobiles Rundenspiel im Hochformat (PWA für Android).
 Tippe einen deiner Spieler an, zieh zurück und lass los: Schieß den Ball ins gegnerische Tor
-oder ramm Goblins, Orks & Co. vom Feld.
+oder ramm Goblins, Orks & Co. vom Feld – bis hin zum Drachen.
 
 ## Entwicklung
 
@@ -27,7 +27,7 @@ Jeder Push auf `main` wird automatisch auf GitHub Pages veröffentlicht, sobald 
 src/core/          Spiellogik ohne DOM – deterministisch und testbar
   config.ts        alle Spielwerte (Feld, Physik, Schuss, Kampf, Regeln)
   types.ts         Datentypen; MatchState ist ein reines, serialisierbares Objekt
-  units.ts         Einheitentypen (Ritter, Goblin, Ork): Radius, Masse, HP, ATK, Schusskraft
+  units.ts         Einheitentypen (Ritter, Goblin, Ork, Drache): Radius, Masse, HP, ATK, Schusskraft
   physics.ts       Kreis-Physik mit festem Zeitschritt, Substeps, Torpfosten
   match.ts         Spielablauf: Schuss → Ausrollen → Zugwechsel, Tore, Rammen/HP, Sieg
   ai.ts            KI: „Geisterball“-Zielen aufs Tor, Rammangriffe, Schwierigkeitsgrade

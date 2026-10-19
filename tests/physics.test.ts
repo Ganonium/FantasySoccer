@@ -72,6 +72,16 @@ describe('Wände und Tore', () => {
     expect(ball.x + ball.y).toBeGreaterThan(400);
   });
 
+  it('hält Einheiten, die größer als die Eckrundung sind, in der Ecke im Feld', () => {
+    const r = FIELD.cornerRadius + 14;
+    const u = unit(0, r + 5, r + 5, { radius: r, mass: 4, vx: -2000, vy: -2000 });
+    for (let i = 0; i < 120; i++) {
+      physicsTick([u], ballAt(450, 800), PHYSICS.TICK);
+      expect(u.x).toBeGreaterThanOrEqual(r - 1e-9);
+      expect(u.y).toBeGreaterThanOrEqual(r - 1e-9);
+    }
+  });
+
   it('bringt alles zum Stillstand', () => {
     const u = unit(0, 450, 800, { vx: 2900, vy: 1500 });
     const ball = ballAt(300, 600);
