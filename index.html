@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#080c0f" />
+  <meta name="description" content="Fußball-Billard gegen Goblins, Orks und mehr." />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icons/icon-192.png" type="image/png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <title>FantasySoccer</title>
+</head>
+<body>
+  <header id="hud" hidden>
+    <div class="score-block">
+      <span class="score-label" id="name-home">Du</span>
+      <span class="score-number" id="score-home">0</span>
+    </div>
+    <div id="turn">–</div>
+    <div class="score-block">
+      <span class="score-label" id="name-away">Gegner</span>
+      <span class="score-number" id="score-away">0</span>
+    </div>
+    <button id="quit" aria-label="Zurück zum Menü">✕</button>
+  </header>
+
+  <main id="stage"><canvas id="canvas"></canvas></main>
+  <div id="banner"></div>
+
+  <section id="menu" class="overlay">
+    <h1>FantasySoccer</h1>
+    <p class="sub">Tippe einen deiner Spieler an, zieh zurück und lass los.<br />Ramm Gegner vom Feld – oder schieß den Ball ins obere Tor.</p>
+    <ol id="levels"></ol>
+  </section>
+
+  <section id="result" class="overlay" hidden>
+    <h1 id="result-title"></h1>
+    <p class="sub" id="result-text"></p>
+    <div class="buttons">
+      <button id="retry">Nochmal</button>
+      <button id="next" class="secondary">Weiter</button>
+      <button id="to-menu" class="secondary">Menü</button>
+    </div>
+  </section>
+
+  <script type="module" src="./src/client/main.ts"></script>
+</body>
+</html>
