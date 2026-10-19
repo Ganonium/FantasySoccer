@@ -72,6 +72,16 @@ body {
 .level .intro { font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.55); }
 .level .badge { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #4fc3f7; }
 
+.easter-eggs { display: flex; gap: 14px; }
+.easter-eggs button {
+  width: 44px; height: 44px; border-radius: 50%; cursor: pointer; font-size: 22px;
+  background: none; border: 1px solid transparent; opacity: 0.25; filter: grayscale(1);
+  transition: opacity 0.2s, filter 0.2s;
+}
+.easter-eggs button[aria-pressed="true"] {
+  opacity: 1; filter: none; border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.06);
+}
+
 .buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .buttons button {
   padding: 14px 28px; border: none; border-radius: 50px; cursor: pointer;
