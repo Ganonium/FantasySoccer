@@ -12,6 +12,7 @@ npm run dev        # Dev-Server, im LAN erreichbar: http://<PC-IP>:5173
 npm test           # Unit-Tests (Vitest)
 npm run build      # Typecheck + Produktions-Build nach dist/
 npm run preview    # Build lokal ansehen (inkl. Service Worker)
+npm run build:artifact  # Einzeldatei dist-artifact/fantasysoccer.html (z. B. als privates Claude-Artifact)
 ```
 
 Auf dem Android-Handy die LAN-Adresse im Chrome öffnen. Über „Zum Startbildschirm hinzufügen“
