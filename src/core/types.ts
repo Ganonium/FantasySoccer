@@ -36,9 +36,13 @@ export interface FormationSlot {
   y: number;
 }
 
+/** Rein optische Variante eines Teams (z. B. schwarze Rüstungen). */
+export type TeamLook = 'default' | 'dark';
+
 export interface TeamSetup {
   name: string;
   color: string;
+  look?: TeamLook;
   formation: FormationSlot[];
 }
 
