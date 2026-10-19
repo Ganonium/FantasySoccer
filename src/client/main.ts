@@ -105,6 +105,8 @@ class Game {
       if (e.type === 'goal') {
         const ours = e.scorer === HUMAN;
         this.showBanner(ours ? '⚽ TOR!' : 'Gegentor', state.setup[e.scorer].color);
+      } else if (e.type === 'goalKick') {
+        this.showBanner('Abstoß', '#ffffff');
       } else if (e.type === 'over') {
         this.input.reset();
         const level = this.level;

@@ -63,6 +63,15 @@ describe('Wände und Tore', () => {
     expect(ball.y).toBeGreaterThanOrEqual(ball.radius - 1e-9);
   });
 
+  it('lenkt den Ball aus der Ecke heraus', () => {
+    const ball = ballAt(120, 120);
+    ball.vx = -1500;
+    ball.vy = -1500;
+    for (let i = 0; i < 240; i++) physicsTick([], ball, PHYSICS.TICK);
+    // Der Ball prallt diagonal zurück ins Feld statt in der Ecke zu kleben.
+    expect(ball.x + ball.y).toBeGreaterThan(400);
+  });
+
   it('bringt alles zum Stillstand', () => {
     const u = unit(0, 450, 800, { vx: 2900, vy: 1500 });
     const ball = ballAt(300, 600);

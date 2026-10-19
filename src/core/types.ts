@@ -78,6 +78,7 @@ export type GameEvent =
   | { type: 'hit'; attackerId: number; targetId: number; damage: number; x: number; y: number }
   | { type: 'ko'; unitId: number; x: number; y: number }
   | { type: 'goal'; scorer: TeamId }
+  | { type: 'goalKick'; x: number; y: number }
   | { type: 'turn'; team: TeamId }
   | { type: 'over'; winner: TeamId; reason: WinReason };
 

@@ -7,6 +7,14 @@ export const FIELD = {
   goalWidth: 360,
   goalDepth: 70,
   postRadius: 10,
+  /** Abgerundete Spielfeldecken – verhindert, dass der Ball in der Ecke festhängt. */
+  cornerRadius: 110,
+  /** 5-Meter-Raum: bleibt der Ball darin liegen, gibt es Abstoß von seiner Ecke. */
+  goalAreaWidth: 520,
+  goalAreaDepth: 130,
+  /** Strafraum (nur Markierung). */
+  penaltyAreaWidth: 640,
+  penaltyAreaDepth: 300,
 } as const;
 
 export const PHYSICS = {
@@ -49,7 +57,10 @@ export const SHOT = {
 } as const;
 
 export const COMBAT = {
-  /** Mindest-Annäherungsgeschwindigkeit, ab der ein Zusammenstoß Schaden macht. */
+  /**
+   * Mindestgeschwindigkeit, mit der der Rammende auf den Gegner zufahren muss, damit der
+   * Zusammenstoß Schaden macht. Rammen kann nur das Team, das gerade geschossen hat.
+   */
   MIN_IMPACT_SPEED: 700,
   /** Dasselbe Paar kann sich frühestens nach dieser Zeit erneut verletzen. */
   HIT_COOLDOWN: 0.35,

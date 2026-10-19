@@ -4,7 +4,8 @@ import { CAMPAIGN } from '../src/core/campaign';
 import { FIELD, PHYSICS, RULES } from '../src/core/config';
 import { activeUnits, createMatch, shoot, tick } from '../src/core/match';
 import { createRng } from '../src/core/rng';
-import type { GameEvent, MatchState } from '../src/core/types';
+import type { GameEvent, MatchState, Unit } from '../src/core/types';
+import { otherTeam } from '../src/core/types';
 
 const level = (id: string) => CAMPAIGN.find(l => l.id === id)!;
 
@@ -105,6 +106,23 @@ describe('HP/ATK – Rammen', () => {
     expect(target.hp).toBe(target.maxHp);
   });
 
+  it('verletzt niemanden, wenn ein weggestoßener Gegner in eine andere Einheit prallt', () => {
+    const s = createMatch(level('goblins').setup);
+    const [attacker, bystander] = activeUnits(s, 'home') as [Unit, Unit];
+    const goblin = activeUnits(s, 'away')[0]!;
+    for (const u of activeUnits(s)) { u.x = 80 + u.id * 10; u.y = 80; } // aus dem Weg
+    s.units.filter(u => u.team === 'away' && u !== goblin).forEach((u, i) => { u.x = 700 + i * 0; u.y = 300 + i * 120; });
+    attacker.x = 450; attacker.y = 1300;
+    goblin.x = 450; goblin.y = 1000;
+    bystander.x = 450; bystander.y = 700;
+    s.ball.x = 150; s.ball.y = 1450;
+    shoot(s, 'home', attacker.id, 0, -2900);
+    const ev = runUntilAim(s);
+    expect(ev.some(e => e.type === 'hit' && e.targetId === goblin.id)).toBe(true);
+    expect(bystander.hp).toBe(bystander.maxHp);
+    expect(ev.filter(e => e.type === 'hit')).toHaveLength(1);
+  });
+
   it('nimmt Einheiten bei 0 HP vom Feld', () => {
     const { s, target } = setupRam(2000);
     target.hp = 1;
@@ -120,6 +138,33 @@ describe('HP/ATK – Rammen', () => {
     expect(s.phase).toBe('over');
     expect(s.winner).toBe('home');
     expect(ev.some(e => e.type === 'over' && e.reason === 'knockout')).toBe(true);
+  });
+});
+
+describe('Spielfeld-Regeln', () => {
+  it('lässt beim Anstoß keinen freien Schusskanal vom Ball ins gegnerische Tor', () => {
+    for (const l of CAMPAIGN) {
+      for (const team of ['home', 'away'] as const) {
+        const s = createMatch(l.setup);
+        const goalY = team === 'home' ? 0 : FIELD.height;
+        const blocked = activeUnits(s, otherTeam(team)).some(u =>
+          Math.abs(u.x - s.ball.x) < u.radius + s.ball.radius && (goalY < s.ball.y ? u.y < s.ball.y : u.y > s.ball.y));
+        expect(blocked, `${l.id}: ${team} hat freie Bahn`).toBe(true);
+      }
+    }
+  });
+
+  it('legt einen im 5-Meter-Raum liegenden Ball auf dessen Ecke (Abstoß)', () => {
+    const s = createMatch(level('training').setup);
+    const u = activeUnits(s, 'home')[0]!;
+    shoot(s, 'home', u.id, 0, -50); // kurzer Zug, Ball bleibt liegen
+    s.ball.x = FIELD.width / 2 - 40;
+    s.ball.y = 40;
+    const ev = runUntilAim(s);
+    expect(ev.some(e => e.type === 'goalKick')).toBe(true);
+    expect(s.ball.y).toBe(FIELD.goalAreaDepth);
+    expect(s.ball.x).toBe(FIELD.width / 2 - FIELD.goalAreaWidth / 2);
+    expect(s.score.home).toBe(0);
   });
 });
 
