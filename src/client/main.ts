@@ -5,6 +5,7 @@ import { PHYSICS, SHOT } from '../core/config';
 import { activeUnits, createMatch, maxShotSpeed, shoot, tick } from '../core/match';
 import { createRng } from '../core/rng';
 import type { GameEvent, MatchState, TeamId } from '../core/types';
+import { loadCosmetics, saveCosmetics, skinText, type Cosmetics } from './cosmetics';
 import { Input } from './input';
 import { loadProgress, markCompleted } from './progress';
 import { Renderer } from './renderer';
@@ -25,7 +26,7 @@ class Game {
   private last = 0;
   private running = false;
   private bannerTimer = 0;
-  private readonly renderer: Renderer;
+  readonly renderer: Renderer;
   private readonly input: Input;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -54,8 +55,8 @@ class Game {
     this.state = createMatch(level.setup);
     this.input.reset();
     this.acc = 0;
-    $('name-home').textContent = level.setup.home.name;
-    $('name-away').textContent = level.setup.away.name;
+    $('name-home').textContent = skinText(level.setup.home.name, cosmetics);
+    $('name-away').textContent = skinText(level.setup.away.name, cosmetics);
     $('score-home').style.color = level.setup.home.color;
     $('score-away').style.color = level.setup.away.color;
     this.updateHud();
@@ -125,7 +126,7 @@ class Game {
     $('score-away').textContent = String(s.score.away);
     const el = $('turn');
     const [text, color] =
-      s.phase === 'aim' ? (s.turn === HUMAN ? ['▶ Dein Zug', s.setup.home.color] : [`◀ ${s.setup.away.name} …`, s.setup.away.color])
+      s.phase === 'aim' ? (s.turn === HUMAN ? ['▶ Dein Zug', s.setup.home.color] : [`◀ ${skinText(s.setup.away.name, cosmetics)} …`, s.setup.away.color])
       : s.phase === 'sim' ? ['···', 'rgba(255,255,255,0.35)']
       : s.phase === 'goal' ? ['Tor', '#ffd600']
       : ['Abpfiff', 'rgba(255,255,255,0.6)'];
@@ -146,6 +147,24 @@ class Game {
 // ── Menü & Ergebnis ──────────────────────────────────────────────────────────
 
 const game = new Game($<HTMLCanvasElement>('canvas'));
+let cosmetics: Cosmetics = loadCosmetics();
+game.renderer.cosmetics = cosmetics;
+
+// Easter Egg: Knöpfe unten im Menü schalten die Verkleidungen der Ritter um.
+function setupEasterEggs(): void {
+  const toggles: Array<[string, keyof Cosmetics]> = [['egg-unicorn', 'unicorn'], ['egg-halloween', 'halloween']];
+  for (const [id, key] of toggles) {
+    const btn = $<HTMLButtonElement>(id);
+    btn.setAttribute('aria-pressed', String(cosmetics[key]));
+    btn.addEventListener('click', () => {
+      cosmetics = { ...cosmetics, [key]: !cosmetics[key] };
+      game.renderer.cosmetics = cosmetics;
+      saveCosmetics(cosmetics);
+      btn.setAttribute('aria-pressed', String(cosmetics[key]));
+      showMenu();
+    });
+  }
+}
 
 function isUnlocked(index: number, completed: string[]): boolean {
   return index === 0 || completed.includes(CAMPAIGN[index - 1]!.id);
@@ -166,10 +185,10 @@ function showMenu(): void {
     const badge = completed.includes(level.id) ? '✓ Geschafft' : btn.disabled ? 'Gesperrt' : `Kapitel ${i + 1}`;
     btn.innerHTML = `<span class="text"><span class="badge"></span><span class="title"></span><span class="intro"></span></span><img class="portrait" alt="" />`;
     const away = level.setup.away;
-    btn.querySelector<HTMLImageElement>('.portrait')!.src = unitSprite(away.formation[0]!.kind, away.color, away.look).toDataURL();
+    btn.querySelector<HTMLImageElement>('.portrait')!.src = unitSprite(away.formation[0]!.kind, away.color, away.look, cosmetics).toDataURL();
     btn.querySelector('.badge')!.textContent = badge;
     btn.querySelector('.title')!.textContent = level.title;
-    btn.querySelector('.intro')!.textContent = level.intro;
+    btn.querySelector('.intro')!.textContent = skinText(level.intro, cosmetics);
     btn.addEventListener('click', () => play(level));
     li.append(btn);
     list.append(li);
@@ -190,7 +209,7 @@ function showResult(state: MatchState, level: Level | null): void {
   $('result-text').textContent =
     state.winReason === 'knockout'
       ? won
-        ? `Alle ${state.setup.away.name} wurden vom Feld gerammt.`
+        ? `Alle ${skinText(state.setup.away.name, cosmetics)} wurden vom Feld gerammt.`
         : 'Deine Mannschaft wurde komplett vom Feld gerammt.'
       : `Endstand ${state.score.home} : ${state.score.away}`;
 
@@ -205,6 +224,7 @@ function showResult(state: MatchState, level: Level | null): void {
 
 $('to-menu').addEventListener('click', showMenu);
 $('quit').addEventListener('click', showMenu);
+setupEasterEggs();
 showMenu();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

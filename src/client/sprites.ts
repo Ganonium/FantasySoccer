@@ -3,6 +3,7 @@
 // Zeichenkoordinaten: Mittelpunkt (0, 0), Markenradius 100, y zeigt nach unten.
 
 import type { TeamLook, UnitKind } from '../core/types';
+import { NO_COSMETICS, type Cosmetics } from './cosmetics';
 
 /** Kantenlänge des Sprite-Canvas in Pixeln – reicht für große Einheiten auf 3x-Displays. */
 const SIZE = 256;
@@ -11,8 +12,13 @@ const INNER = 86;
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-export function unitSprite(kind: UnitKind, color: string, look: TeamLook = 'default'): HTMLCanvasElement {
-  const key = `${kind}|${color}|${look}`;
+export function unitSprite(
+  kind: UnitKind,
+  color: string,
+  look: TeamLook = 'default',
+  cosmetics: Cosmetics = NO_COSMETICS,
+): HTMLCanvasElement {
+  const key = `${kind}|${color}|${look}|${cosmetics.unicorn}|${cosmetics.halloween}`;
   let sprite = cache.get(key);
   if (!sprite) {
     sprite = document.createElement('canvas');
@@ -21,14 +27,14 @@ export function unitSprite(kind: UnitKind, color: string, look: TeamLook = 'defa
     if (ctx) {
       ctx.translate(SIZE / 2, SIZE / 2);
       ctx.scale(SIZE / 200, SIZE / 200);
-      drawToken(ctx, kind, color, look);
+      drawToken(ctx, kind, color, look, cosmetics);
     }
     cache.set(key, sprite);
   }
   return sprite;
 }
 
-function drawToken(ctx: CanvasRenderingContext2D, kind: UnitKind, color: string, look: TeamLook): void {
+function drawToken(ctx: CanvasRenderingContext2D, kind: UnitKind, color: string, look: TeamLook, cosmetics: Cosmetics): void {
   // Hintergrund: dunkel getönte Teamfarbe
   const bg = ctx.createRadialGradient(0, -30, 10, 0, 0, INNER);
   bg.addColorStop(0, mix(color, '#000000', 0.55));
@@ -40,7 +46,10 @@ function drawToken(ctx: CanvasRenderingContext2D, kind: UnitKind, color: string,
 
   ctx.save();
   ctx.clip();
-  if (kind === 'knight') drawKnight(ctx, color, look);
+  if (kind === 'knight') {
+    if (cosmetics.unicorn) drawUnicorn(ctx, color, look, cosmetics.halloween);
+    else drawKnight(ctx, color, look, cosmetics.halloween);
+  }
   else if (kind === 'goblin') drawGoblin(ctx, color);
   else drawOrc(ctx, color);
   ctx.restore();
@@ -48,7 +57,7 @@ function drawToken(ctx: CanvasRenderingContext2D, kind: UnitKind, color: string,
 
 // ── Ritter ───────────────────────────────────────────────────────────────────
 
-function drawKnight(ctx: CanvasRenderingContext2D, color: string, look: TeamLook): void {
+function drawKnight(ctx: CanvasRenderingContext2D, color: string, look: TeamLook, halloween: boolean): void {
   const dark = look === 'dark';
   const steelLight = dark ? '#5a616b' : '#eef2f5';
   const steelMid = dark ? '#2c3138' : '#a7b1ba';
@@ -78,6 +87,11 @@ function drawKnight(ctx: CanvasRenderingContext2D, color: string, look: TeamLook
   ctx.fillStyle = dark ? '#111' : '#fff';
   ctx.fillRect(-4, 62, 8, 30);
   ctx.fillRect(-13, 70, 26, 7);
+
+  if (halloween) {
+    drawPumpkinHelm(ctx, dark);
+    return;
+  }
 
   // Helmbusch in Teamfarbe
   ctx.save();
@@ -141,6 +155,275 @@ function drawKnight(ctx: CanvasRenderingContext2D, color: string, look: TeamLook
   ctx.ellipse(-24, -38, 7, 16, 0.4, 0, Math.PI * 2);
   ctx.fillStyle = dark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.55)';
   ctx.fill();
+}
+
+// ── Easter Egg: Kürbishelm, Einhorn, Hexenhut ─────────────────────────────────
+
+/** Freundlich grinsender Kürbis als Helm – lustig, nicht gruselig. */
+function drawPumpkinHelm(ctx: CanvasRenderingContext2D, dark: boolean): void {
+  const orange = dark ? '#f57c00' : '#ffa726';
+  const orangeDark = dark ? '#bf360c' : '#e65100';
+  const outline = '#6d2a00';
+
+  // Stiel mit Ranke
+  ctx.beginPath();
+  ctx.moveTo(-6, -50);
+  ctx.quadraticCurveTo(-4, -70, 8, -78);
+  ctx.lineTo(14, -72);
+  ctx.quadraticCurveTo(6, -64, 7, -50);
+  ctx.closePath();
+  ctx.fillStyle = '#66bb6a';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#1b5e20';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(8, -62);
+  ctx.bezierCurveTo(24, -70, 30, -56, 22, -54);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#43a047';
+  ctx.stroke();
+
+  // Kürbis aus fünf Rippen, außen beginnend
+  for (const x of [-34, 34, -18, 18, 0]) {
+    ctx.beginPath();
+    ctx.ellipse(x, -2, 24, 52, 0, 0, Math.PI * 2);
+    const g = ctx.createLinearGradient(x - 24, 0, x + 24, 0);
+    g.addColorStop(0, orangeDark);
+    g.addColorStop(0.4, orange);
+    g.addColorStop(1, orangeDark);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = outline;
+    ctx.stroke();
+  }
+
+  // Gesicht: runde, fröhliche Augen und ein breites Lächeln mit Zahnlücke
+  ctx.fillStyle = '#ffe082';
+  ctx.shadowColor = '#ffca28';
+  ctx.shadowBlur = 10;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(side * 20, -6, 11, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.moveTo(-4, 4);
+  ctx.lineTo(4, 4);
+  ctx.lineTo(0, 11);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-32, 16);
+  ctx.quadraticCurveTo(0, 50, 32, 16);
+  ctx.quadraticCurveTo(0, 30, -32, 16);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = orange;
+  ctx.fillRect(-12, 22, 8, 9);
+  ctx.fillRect(6, 22, 8, 9);
+
+  // Glanzlicht
+  ctx.beginPath();
+  ctx.ellipse(-30, -32, 5, 12, 0.3, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fill();
+}
+
+function drawUnicorn(ctx: CanvasRenderingContext2D, color: string, look: TeamLook, halloween: boolean): void {
+  // Die Schwarzen Ritter werden zu Nacht-Einhörnern.
+  const dark = look === 'dark';
+  const coat = dark ? '#4a4e6e' : '#ffffff';
+  const coatShade = dark ? '#2e3150' : '#dcd6f0';
+  const muzzle = dark ? '#6c6f94' : '#f8d7e3';
+  const outline = dark ? '#15172b' : '#7a6a90';
+  const maneLight = mix(color, '#ffffff', 0.45);
+
+  // Hals mit Halstuch in Teamfarbe
+  ctx.beginPath();
+  ctx.ellipse(0, 86, 40, 36, 0, 0, Math.PI * 2);
+  ctx.fillStyle = coat;
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-38, 64);
+  ctx.quadraticCurveTo(0, 82, 38, 64);
+  ctx.lineTo(30, 80);
+  ctx.quadraticCurveTo(0, 96, -30, 80);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.stroke();
+
+  // Lockige Mähne zu beiden Seiten
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.arc(side * (40 + (i % 2) * 6), -36 + i * 20, 14, 0, Math.PI * 2);
+      ctx.fillStyle = i % 2 ? color : maneLight;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = mix(color, '#000000', 0.4);
+      ctx.stroke();
+    }
+  }
+
+  // Ohren
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * 16, -44);
+    ctx.lineTo(side * 34, -72);
+    ctx.lineTo(side * 36, -36);
+    ctx.closePath();
+    ctx.fillStyle = coat;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(side * 22, -46);
+    ctx.lineTo(side * 32, -64);
+    ctx.lineTo(side * 32, -42);
+    ctx.closePath();
+    ctx.fillStyle = '#f48fb1';
+    ctx.fill();
+  }
+
+  // Kopf: breite Stirn, lange Nase, rundes Maul
+  const head = new Path2D();
+  head.moveTo(0, -54);
+  head.bezierCurveTo(30, -54, 40, -30, 36, 0);
+  head.bezierCurveTo(34, 24, 32, 56, 0, 58);
+  head.bezierCurveTo(-32, 56, -34, 24, -36, 0);
+  head.bezierCurveTo(-40, -30, -30, -54, 0, -54);
+  const g = ctx.createRadialGradient(-10, -20, 6, 0, 0, 64);
+  g.addColorStop(0, coat);
+  g.addColorStop(1, coatShade);
+  ctx.fillStyle = g;
+  ctx.fill(head);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = outline;
+  ctx.stroke(head);
+  ctx.beginPath();
+  ctx.ellipse(0, 38, 28, 20, 0, 0, Math.PI * 2);
+  ctx.fillStyle = muzzle;
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.fillStyle = outline;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(side * 9, 34, 3.5, 5, side * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.arc(0, 42, 9, 0.2 * Math.PI, 0.8 * Math.PI);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+
+  // Stirnlocke
+  for (const [x, y, c] of [[-10, -50, color], [8, -52, maneLight], [0, -44, color]] as const) {
+    ctx.beginPath();
+    ctx.arc(x, y, 11, 0, Math.PI * 2);
+    ctx.fillStyle = c;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = mix(color, '#000000', 0.4);
+    ctx.stroke();
+  }
+
+  // Große Kulleraugen mit Wimpern und rosa Bäckchen
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(side * 18, -6, 8, 10, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1030';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(side * 18 - 3, -10, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#1a1030';
+    for (const a of [-0.9, -0.5, -0.1]) {
+      ctx.beginPath();
+      ctx.moveTo(side * (18 + Math.cos(a) * 9), -6 + Math.sin(a) * 11);
+      ctx.lineTo(side * (18 + Math.cos(a) * 15), -6 + Math.sin(a) * 16);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.ellipse(side * 26, 14, 7, 4.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(244,143,177,0.6)';
+    ctx.fill();
+  }
+
+  // Goldenes Spiralhorn
+  ctx.beginPath();
+  ctx.moveTo(-9, -50);
+  ctx.lineTo(0, -94);
+  ctx.lineTo(9, -50);
+  ctx.closePath();
+  const gold = ctx.createLinearGradient(-9, 0, 9, 0);
+  gold.addColorStop(0, '#ffb300');
+  gold.addColorStop(0.5, '#fff59d');
+  gold.addColorStop(1, '#ff8f00');
+  ctx.fillStyle = gold;
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#a66a00';
+  ctx.stroke();
+  ctx.lineWidth = 2;
+  for (let i = 1; i <= 3; i++) {
+    const y = -50 - i * 10;
+    const w = 9 * (1 - (i * 10) / 44);
+    ctx.beginPath();
+    ctx.moveTo(-w, y + 3);
+    ctx.lineTo(w, y - 3);
+    ctx.stroke();
+  }
+
+  if (halloween) drawWitchHat(ctx);
+}
+
+/** Kleiner, schief sitzender Hexenhut neben dem Horn. */
+function drawWitchHat(ctx: CanvasRenderingContext2D): void {
+  ctx.save();
+  ctx.translate(-30, -48);
+  ctx.rotate(-0.35);
+  const outline = '#311b92';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 30, 8, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#7e57c2';
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-17, -2);
+  ctx.quadraticCurveTo(-6, -24, -2, -40);
+  ctx.quadraticCurveTo(-12, -42, -16, -36);
+  ctx.quadraticCurveTo(4, -40, 17, -2);
+  ctx.closePath();
+  ctx.fillStyle = '#9575cd';
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffa726';
+  ctx.fillRect(-15, -9, 30, 6);
+  // Stern
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    const r = i % 2 ? 2.5 : 6;
+    ctx.lineTo(2 + Math.cos(a) * r, -20 + Math.sin(a) * r);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#ffee58';
+  ctx.fill();
+  ctx.restore();
 }
 
 // ── Goblin ───────────────────────────────────────────────────────────────────
