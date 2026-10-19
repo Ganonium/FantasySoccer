@@ -51,6 +51,7 @@ function drawToken(ctx: CanvasRenderingContext2D, kind: UnitKind, color: string,
     else drawKnight(ctx, color, look, cosmetics.halloween);
   }
   else if (kind === 'goblin') drawGoblin(ctx, color);
+  else if (kind === 'dragon') drawDragon(ctx, color);
   else drawOrc(ctx, color);
   ctx.restore();
 }
@@ -727,6 +728,228 @@ function drawOrc(ctx: CanvasRenderingContext2D, color: string): void {
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = outline;
     ctx.stroke();
+  }
+}
+
+// ── Drache ───────────────────────────────────────────────────────────────────
+
+function drawDragon(ctx: CanvasRenderingContext2D, color: string): void {
+  const skin = '#c62828';
+  const skinLight = '#ef5350';
+  const skinDark = '#7f0000';
+  const outline = '#3e0000';
+  const horn = '#fff3e0';
+
+  // Fledermausflügel mit Flughaut in Teamfarbe
+  for (const side of [-1, 1]) {
+    const wing = new Path2D();
+    wing.moveTo(side * 30, 40);
+    wing.lineTo(side * 58, -72);
+    wing.lineTo(side * 98, -34);
+    wing.quadraticCurveTo(side * 84, -18, side * 92, 4);
+    wing.quadraticCurveTo(side * 74, 6, side * 80, 32);
+    wing.quadraticCurveTo(side * 60, 34, side * 56, 60);
+    wing.closePath();
+    ctx.fillStyle = mix(color, '#000000', 0.25);
+    ctx.fill(wing);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = outline;
+    ctx.stroke(wing);
+    // Flügelknochen
+    ctx.beginPath();
+    ctx.moveTo(side * 30, 40);
+    ctx.lineTo(side * 58, -72);
+    for (const [x, y] of [[98, -34], [92, 4], [80, 32]] as const) {
+      ctx.moveTo(side * 58, -72);
+      ctx.lineTo(side * x, y);
+    }
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = skinDark;
+    ctx.stroke();
+    // Kralle an der Flügelspitze
+    ctx.beginPath();
+    ctx.moveTo(side * 54, -70);
+    ctx.lineTo(side * 54, -84);
+    ctx.lineTo(side * 62, -72);
+    ctx.closePath();
+    ctx.fillStyle = horn;
+    ctx.fill();
+  }
+
+  // Hals und Brust mit Bauchschuppen
+  ctx.beginPath();
+  ctx.ellipse(0, 88, 44, 42, 0, 0, Math.PI * 2);
+  ctx.fillStyle = skin;
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(0, 92, 24, 40, 0, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = '#ffcc80';
+  ctx.fillRect(-30, 50, 60, 60);
+  ctx.strokeStyle = '#e0913a';
+  ctx.lineWidth = 2;
+  for (let y = 58; y < 100; y += 9) {
+    ctx.beginPath();
+    ctx.moveTo(-26, y);
+    ctx.quadraticCurveTo(0, y + 5, 26, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Gebogene Hörner
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * 14, -44);
+    ctx.quadraticCurveTo(side * 30, -70, side * 56, -86);
+    ctx.quadraticCurveTo(side * 40, -60, side * 34, -36);
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, -86, 0, -36);
+    g.addColorStop(0, horn);
+    g.addColorStop(1, '#bcaaa4');
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = outline;
+    ctx.stroke();
+  }
+
+  // Stachelkamm auf der Stirn
+  ctx.fillStyle = skinDark;
+  for (const [x, y, h] of [[0, -50, 16], [-11, -48, 10], [11, -48, 10]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x - 6, y + 4);
+    ctx.lineTo(x, y - h);
+    ctx.lineTo(x + 6, y + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = outline;
+    ctx.stroke();
+  }
+
+  // Wangenstacheln
+  for (const side of [-1, 1]) {
+    for (const [y, len] of [[-12, 20], [4, 16]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(side * 40, y - 8);
+      ctx.lineTo(side * (40 + len), y + 2);
+      ctx.lineTo(side * 38, y + 8);
+      ctx.closePath();
+      ctx.fillStyle = skinDark;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = outline;
+      ctx.stroke();
+    }
+  }
+
+  // Kopf: breiter Schädel, zur Schnauze hin schmaler
+  const head = new Path2D();
+  head.moveTo(0, -50);
+  head.bezierCurveTo(30, -50, 46, -32, 44, -6);
+  head.bezierCurveTo(42, 14, 32, 22, 30, 36);
+  head.bezierCurveTo(28, 52, 12, 58, 0, 58);
+  head.bezierCurveTo(-12, 58, -28, 52, -30, 36);
+  head.bezierCurveTo(-32, 22, -42, 14, -44, -6);
+  head.bezierCurveTo(-46, -32, -30, -50, 0, -50);
+  const g = ctx.createRadialGradient(-10, -24, 6, 0, 0, 64);
+  g.addColorStop(0, skinLight);
+  g.addColorStop(0.6, skin);
+  g.addColorStop(1, skinDark);
+  ctx.fillStyle = g;
+  ctx.fill(head);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = outline;
+  ctx.stroke(head);
+
+  // Schuppen auf der Stirn
+  ctx.save();
+  ctx.clip(head);
+  ctx.strokeStyle = 'rgba(62,0,0,0.45)';
+  ctx.lineWidth = 2;
+  for (const [x, y] of [[-14, -38], [0, -34], [14, -38], [-7, -26], [7, -26]] as const) {
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Schnauze mit Nüstern
+  ctx.beginPath();
+  ctx.ellipse(0, 34, 25, 20, 0, 0, Math.PI * 2);
+  ctx.fillStyle = skinLight;
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+  ctx.fillStyle = outline;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(side * 9, 28, 4, 3, side * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Rauchwölkchen aus den Nüstern
+  ctx.fillStyle = 'rgba(207,216,220,0.8)';
+  for (const side of [-1, 1]) {
+    for (const [dx, dy, r] of [[28, 40, 4], [37, 47, 6], [49, 52, 8]] as const) {
+      ctx.beginPath();
+      ctx.arc(side * dx, dy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Maul mit zwei Fangzähnen
+  ctx.beginPath();
+  ctx.moveTo(-18, 46);
+  ctx.quadraticCurveTo(0, 52, 18, 46);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+  ctx.fillStyle = horn;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * 9, 48);
+    ctx.lineTo(side * 15, 47);
+    ctx.lineTo(side * 12, 57);
+    ctx.closePath();
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // Stirnwülste
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * 6, -18);
+    ctx.quadraticCurveTo(side * 22, -30, side * 38, -22);
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = skinDark;
+    ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+
+  // Bernsteinaugen mit Schlitzpupille
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.ellipse(side * 21, -8, 11, 8, side * -0.25, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd54f';
+    ctx.shadowColor = '#ffab00';
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = outline;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(side * 21, -8, 2.5, 7, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#111';
+    ctx.fill();
   }
 }
 

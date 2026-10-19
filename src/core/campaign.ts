@@ -42,6 +42,13 @@ const ORCS: TeamSetup = {
   ],
 };
 
+// Ein einzelner Drache in der Mitte vor dem eigenen Tor – groß genug, um es fast allein zu decken.
+const DRAGON: TeamSetup = {
+  name: 'Drache',
+  color: '#ba68c8',
+  formation: [{ kind: 'dragon', x: 0.5, y: 0.8 }],
+};
+
 export interface Level {
   id: string;
   title: string;
@@ -71,5 +78,12 @@ export const CAMPAIGN: Level[] = [
     intro: 'Nur zwei Orks – aber groß, schwer und mit hartem Schlag. Halte Abstand und spiel über die Flügel.',
     setup: { home: HEROES, away: ORCS, goalsToWin: 3, firstKickoff: 'home' },
     difficulty: 'normal',
+  },
+  {
+    id: 'dragon',
+    title: 'Drachenhort',
+    intro: 'Nur ein einziger Gegner – aber was für einer! Der Drache versperrt fast das ganze Tor und hält acht Treffer aus. Lock ihn aus seinem Hort und schieß an ihm vorbei.',
+    setup: { home: HEROES, away: DRAGON, goalsToWin: 3, firstKickoff: 'home' },
+    difficulty: 'hard',
   },
 ];
