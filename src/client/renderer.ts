@@ -1,6 +1,7 @@
 import { FIELD, SHOT } from '../core/config';
 import { POSTS } from '../core/physics';
 import type { GameEvent, MatchState, TeamId, TeamLook, Unit } from '../core/types';
+import { NO_COSMETICS, type Cosmetics } from './cosmetics';
 import { unitSprite } from './sprites';
 
 /** Rand um Feld und Tore in Feld-Einheiten. */
@@ -45,6 +46,8 @@ export class Renderer {
   private effects: Effect[] = [];
   private flashes = new Map<number, number>();
   private clock = 0;
+  /** Easter-Egg-Verkleidungen, vom Menü gesetzt. */
+  cosmetics: Cosmetics = NO_COSMETICS;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -227,7 +230,7 @@ export class Renderer {
     ctx.fill();
 
     // Porträt der Einheit
-    ctx.drawImage(unitSprite(u.kind, color, look), -r, -r, 2 * r, 2 * r);
+    ctx.drawImage(unitSprite(u.kind, color, look, this.cosmetics), -r, -r, 2 * r, 2 * r);
     if (flash > 0) {
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
