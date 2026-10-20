@@ -166,10 +166,6 @@ function setupEasterEggs(): void {
   }
 }
 
-function isUnlocked(index: number, completed: string[]): boolean {
-  return index === 0 || completed.includes(CAMPAIGN[index - 1]!.id);
-}
-
 function showMenu(): void {
   game.stop();
   $('hud').hidden = true;
@@ -181,8 +177,8 @@ function showMenu(): void {
     const li = document.createElement('li');
     const btn = document.createElement('button');
     btn.className = 'level';
-    btn.disabled = !isUnlocked(i, completed);
-    const badge = completed.includes(level.id) ? '✓ Geschafft' : btn.disabled ? 'Gesperrt' : `Kapitel ${i + 1}`;
+    // Alle Gegner sind frei wählbar – keine feste Reihenfolge, damit sich jeder einzeln spielen lässt.
+    const badge = completed.includes(level.id) ? '✓ Geschafft' : `Kapitel ${i + 1}`;
     btn.innerHTML = `<span class="text"><span class="badge"></span><span class="title"></span><span class="intro"></span></span><img class="portrait" alt="" />`;
     const away = level.setup.away;
     btn.querySelector<HTMLImageElement>('.portrait')!.src = unitSprite(away.formation[0]!.kind, away.color, away.look, cosmetics).toDataURL();
